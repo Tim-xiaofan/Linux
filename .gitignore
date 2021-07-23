@@ -74,3 +74,8 @@ ch-15 UDP Net Programming/p2p/endpoint
 ch-14 TCP advanced application/socketctrl/ioctl
 test/glib-test/glib_test
 ch-15 UDP Net Programming/broadcast/udp_broadcast
+ch-15 UDP Net Programming/group-broadcast/recv
+ch-15 UDP Net Programming/group-broadcast/core
+ch-15 UDP Net Programming/group-broadcast/send
+ch-15 UDP Net Programming/group-broadcast/group_broadcast
+test/ioctl/ioctl

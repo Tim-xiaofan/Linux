@@ -19,6 +19,7 @@
 #include <arpa/inet.h>
 #include <signal.h>
 #include <time.h>
+#include <netdb.h>
 
 #define BUF_SIZE 1024
 #define PORT 10000
@@ -36,17 +37,33 @@ void signal_handle(int signum)
 	}
 }
 
+static void setsockopt_err(int num)
+{
+	switch(num)
+	{
+		case EBADF:printf("EBADF\n");break;
+		case EFAULT:printf("EFAULT\n");break;
+		case EINVAL:printf("EINVAL\n");break;
+		case ENOPROTOOPT:printf("ENOPROTOOPT\n");break;
+		case ENOTSOCK:printf("ENOTSOCK\n");break;
+		default:fprintf(stderr, "Unknown error\n");
+	}
+}
+
 int main(int ac, char * av[])
 {
 	struct sockaddr_in localaddr, remoteaddr;
-	int sockfd, ret, yes;
+	int sockfd, ret;
 	socklen_t addrlen;
 	char buf[BUF_SIZE];
 	time_t tm;
+	struct ip_mreq im;
+	//struct hostent *group;
+	//struct in_addr ia;
 
-	if(ac < 2)
+	if(ac == 1)
 	{
-		printf("Usage : ./program mode (broadcast-addr)\n");
+		printf("Usage : ./program mode ##args\n");
 		exit(EXIT_FAILURE);
 	}
 
@@ -62,14 +79,30 @@ int main(int ac, char * av[])
 	if(strncmp("recv", av[1], 4) == 0)
 	{
 		printf("mode is recv\n");
-
-		if(ac != 2)
+		if(ac != 4)
 		{
-			printf("Usage : ./program recv\n");
+			printf("Usage : ./program recv groupaddr localaddr\n");
 			exit(EXIT_FAILURE);
 		}
+
+		/** 设置组播地址*/
+		bzero(&im, sizeof(struct ip_mreq));
+		im.imr_multiaddr.s_addr = inet_addr(av[2]);
+		im.imr_interface.s_addr = htonl(INADDR_ANY);
+		printf("localaddr is %s\n", inet_ntoa(im.imr_interface));
+		printf("groupaddr is %s\n", inet_ntoa(im.imr_multiaddr));
+		/* 设置发送组播消息的源主机的地址信息 */
+		/** 将自己的IP加入组播地址*/
+		ret = setsockopt(sockfd, IPPROTO_IP, IP_ADD_MEMBERSHIP, &im, sizeof(struct ip_mreq));	
+		if(ret == -1)
+		{
+			perror("setsockopt(IP_ADD_MEMBERSHIP)");
+			setsockopt_err(errno);
+			exit(errno);
+		}
+
 		localaddr.sin_family = AF_INET;
-		localaddr.sin_addr.s_addr = INADDR_ANY;//必须指定接收的IP数据为任意IP
+		localaddr.sin_addr.s_addr = htonl(INADDR_ANY);//本机IP
 		localaddr.sin_port = htons(PORT);
 		ret = bind(sockfd, (struct sockaddr *)&localaddr, sizeof(struct sockaddr));
 		if(ret < 0)
@@ -80,6 +113,8 @@ int main(int ac, char * av[])
 		printf("bind(%s:%d)\n", 
 					inet_ntoa(localaddr.sin_addr), 
 					ntohs(localaddr.sin_port));
+
+		addrlen = sizeof(struct sockaddr_in);
 		while(!force_quit)
 		{
 			ret = recvfrom(sockfd, 
@@ -103,25 +138,19 @@ int main(int ac, char * av[])
 	else if(strncmp("send", av[1], 4) == 0)
 	{
 		printf("mode is send\n");
-		if(ac != 3)
+		if(ac != 4)
 		{
-			printf("Usage : ./program send broadcast-addr\n");
+			printf("Usage : ./program send groupaddr localaddr\n");
 			exit(EXIT_FAILURE);
 		}
 
-		yes = 1;
-		ret = setsockopt(sockfd, SOL_SOCKET, SO_BROADCAST, &yes, sizeof(yes));
-		if(ret < 0)
-		{
-			perror("setsockopt");
-			exit(EXIT_FAILURE);
-		}
 		remoteaddr.sin_family = AF_INET;
-		remoteaddr.sin_addr.s_addr = inet_addr(av[2]);
+		remoteaddr.sin_addr.s_addr = inet_addr(av[2]);//group addr
 		remoteaddr.sin_port = htons(PORT);
 		addrlen = sizeof(struct sockaddr_in);
 		localaddr.sin_family = AF_INET;
-		localaddr.sin_port = htons(PORT);
+		localaddr.sin_port = htons(PORT + 1);
+		localaddr.sin_addr.s_addr = inet_addr(av[3]);//localaddr
 
 		ret = bind(sockfd, (const struct sockaddr *)&localaddr, sizeof(struct sockaddr));
 		if(ret < 0)
@@ -163,6 +192,5 @@ int main(int ac, char * av[])
 		fprintf(stderr, "unkown mode %s\n", av[1]);
 	}
 	close(sockfd);
-
 	return 0;
 }
