@@ -80,3 +80,5 @@ ch-15 UDP Net Programming/group-broadcast/send
 ch-15 UDP Net Programming/group-broadcast/group_broadcast
 test/ioctl/ioctl
 ch-15 UDP Net Programming/signal-IO/endpoint
+ch-15 UDP Net Programming/hostname/gethostbyaddr
+ch-15 UDP Net Programming/hostname/gethostbyname
