@@ -88,7 +88,7 @@ int main(int ac, char * av[])
 		/** 设置组播地址*/
 		bzero(&im, sizeof(struct ip_mreq));
 		im.imr_multiaddr.s_addr = inet_addr(av[2]);
-		im.imr_interface.s_addr = htonl(INADDR_ANY);
+		im.imr_interface.s_addr = inet_addr(av[3]);
 		printf("localaddr is %s\n", inet_ntoa(im.imr_interface));
 		printf("groupaddr is %s\n", inet_ntoa(im.imr_multiaddr));
 		/* 设置发送组播消息的源主机的地址信息 */
