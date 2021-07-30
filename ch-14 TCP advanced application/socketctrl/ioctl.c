@@ -36,7 +36,7 @@ int main(int ac, char * av[])
 	strcpy(ifr.ifr_name, av[1]);
 	if(ioctl(inet_sock, SIOCGIFADDR, &ifr)< 0) //获取接口IP信息 
 	  perror ("ioct1");
-	printf("%s\n", inet_ntoa(((struct sockaddr_in*)&(ifr.ifr_addr))->sin_addr));
+	printf("ips : %s\n", inet_ntoa(((struct sockaddr_in*)&(ifr.ifr_addr))->sin_addr));
 
 	if(ioctl(inet_sock, SIOCGIFHWADDR, &ifr)< 0) //获取接口MAC信息 
 	  perror ("ioct1");

@@ -1,10 +1,27 @@
 #include "./sem_test.h"
+#include <time.h>
+#include <stdint.h>
+#include <stdbool.h>
 
 int main(int argc, char* argv[])
 {
     unsigned short a[2] = {4, 6};
-    int sem = get_sem(2);
+    int sem;
+    key_t key;
 
+	key = ftok(argv[0], (uint8_t)time(NULL));
+    if (key == -1)
+    { //获取key值
+        printf("ftok:%s\n", strerror(errno));
+        return -1;
+    }
+	printf("key = %d\n", key);
+    if ((sem = semget(key, 2, IPC_CREAT | 0770)) == -1)
+    { //创建信号量集合，包含2个信号量
+        printf("semget:%s\n", strerror(errno));
+        return -1;
+    }
+	printf("semid = %d\n", sem);
     //初始化
     union semun args;
     args.array = a;
@@ -15,7 +32,7 @@ int main(int argc, char* argv[])
     semctl(sem, 0 , GETALL, args);
     int i;
     for(i = 0; i <2; i++){
-        printf("sem %d's val = %d\n", b[i]);
+        printf("sem %d's val = %u\n", i, b[i]);
     }
 
     //依次取出

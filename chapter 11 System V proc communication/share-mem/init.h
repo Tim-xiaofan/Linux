@@ -3,7 +3,7 @@
 #include <sys/shm.h>
 
 #include "./msfw_q.h"
-#include "../11.3sem_communicate//sem_test.h"
+#include "../semaphore-communicate/sem_test.h"
 
 #define SHM_KEY 2056
 #define SHM_SIZE 1024
