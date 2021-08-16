@@ -89,3 +89,9 @@ chapter 11 System V proc communication/share-mem/consumer
 chapter 11 System V proc communication/share-mem/core
 chapter 11 System V proc communication/share-mem/shm_test
 test/fileop/fileop
+test/module/hello.ko
+test/raw-socket/raw_socket
+ch-11 System V proc communication/11.2消息队列/ipcmsg_test
+ch-11 System V proc communication/share-mem/productor
+ch-11 System V proc communication/share-mem/consumer
+ch-11 System V proc communication/share-mem/shm_test

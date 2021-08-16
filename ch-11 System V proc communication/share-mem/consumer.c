@@ -49,4 +49,5 @@ int main(int ac, char *av[])
         //释放一个空的缓冲区
         sem_v(semid, EMPTY);
     }
+	return 0;
 }
