@@ -88,7 +88,4 @@ chapter 11 System V proc communication/share-mem/productor
 chapter 11 System V proc communication/share-mem/consumer
 chapter 11 System V proc communication/share-mem/core
 chapter 11 System V proc communication/share-mem/shm_test
-chapter 11 System V proc communication/semaphore-communicate/sem_test
-chapter 11 System V proc communication/share-mem/consumer
-chapter 11 System V proc communication/share-mem/productor
-chapter 11 System V proc communication/share-mem/shm_test
+test/fileop/fileop
