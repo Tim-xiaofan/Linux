@@ -9,6 +9,8 @@ core*
 *.mod.c
 *.order
 *.ko
+*.cmd
+*tmp_versions*
 temp/Makefile_test/tags
 temp/memsize_of_point_test
 temp/multithreads_gdb
