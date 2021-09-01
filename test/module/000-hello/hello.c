@@ -9,6 +9,7 @@ static int __init
 hello_init(void)
 {
 	printk(KERN_INFO "Hello World enter.\n");
+	printk(KERN_INFO "Hello World enter1.\n");
 	return 0;
 }
 
