@@ -10,6 +10,7 @@ core*
 *.order
 *.ko
 *.cmd
+*.mod
 *tmp_versions*
 temp/Makefile_test/tags
 temp/memsize_of_point_test
@@ -101,3 +102,5 @@ ch-11 System V proc communication/11.2消息队列/ipcmsg_test
 ch-11 System V proc communication/share-mem/productor
 ch-11 System V proc communication/share-mem/consumer
 ch-11 System V proc communication/share-mem/shm_test
+test/module/000-hello/hello.ko
+test/module/001-kernel-user/src/kernel_user.ko

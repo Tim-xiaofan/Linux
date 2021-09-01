@@ -1,1 +1,0 @@
-cmd_/home/zyj/workspace/Linux/test/module/hello.ko := ld -r -m elf_x86_64 -T ./scripts/module-common.lds --build-id  -o /home/zyj/workspace/Linux/test/module/hello.ko /home/zyj/workspace/Linux/test/module/hello.o /home/zyj/workspace/Linux/test/module/hello.mod.o
