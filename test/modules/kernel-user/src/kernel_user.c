@@ -6,15 +6,11 @@
 #include <linux/module.h>
 #include <linux/cdev.h>
 #include <linux/netdevice.h>
+#include "entry_points.h"
 
 #define DEVNAME "kudev"
 
 /** FUNCTIONS*/
-static int ku_open(struct inode *node, struct file *fp);
-static int ku_release(struct inode *node, struct file *fp);
-static ssize_t ku_read(struct file *fp, char __user *buf, size_t size, loff_t * offset);
-static ssize_t ku_write(struct file *fp, const char __user *buf, size_t size, loff_t * offset);
-static long ku_ioctl(struct file *fp, unsigned int cmd, unsigned long arg);
 static int create_devfiles(void);
 static void destroy_devfiles(void);
 
@@ -22,11 +18,11 @@ static struct cdev * kudev = NULL;
 static struct file_operations ku_fops = 
 {
 	.owner = THIS_MODULE,
-	.open = ku_open,
-	.release = ku_release,
-	.read = ku_read,
-	.write = ku_write,
-	.unlocked_ioctl = ku_ioctl,
+	.open = ep_open,
+	.release = ep_release,
+	.read = ep_read,
+	.write = ep_write,
+	.unlocked_ioctl = ep_ioctl,
 };
 
 static int minor					    = 0;
@@ -39,7 +35,6 @@ static int fops_registered			    = 0;
 //static struct files_struct *g_sfile   = NULL;
 //static struct socket * g_socket		= NULL;
 static struct class *cls                = NULL;
-static char write_buf[1204];
 //static char read_buf[1204];
 
 static int __init 
@@ -98,59 +93,6 @@ ku_exit(void)
 	}
 }
 
-
-static int 
-ku_open(struct inode *node, struct file *fp)
-{
-	printk(KERN_INFO "ku open\n");
-	return 0;
-}
-
-static int 
-ku_release(struct inode *node, struct file *fp)
-{
-	printk(KERN_INFO "ku release\n");
-	return 0;
-}
-
-static ssize_t 
-ku_read(struct file *fp, char __user *buf, size_t size, loff_t * offset)
-{
-    int uncopied;
-    static const char * msg = "kernel_user";//11 bytes
-    static const int len = 12;
-    /*将内核空间的数据copy到用户空间*/
-    uncopied = copy_to_user(buf, msg, len);
-    if(uncopied)
-    {
-        printk(KERN_ERR "read : %d byte(s) not copy_to_user\n", uncopied);
-        return -EFAULT;
-    }
-    return len;
-}
-
-static ssize_t 
-ku_write(struct file *fp, const char __user *buf, size_t size, loff_t * offset)
-{
-    int uncopied; 
-    /*将用户空间的数据copy到内核空间*/
-    uncopied = copy_from_user(write_buf, buf, size);
-    if(uncopied != 0)//未复制的非零(byte)
-    {
-        printk(KERN_ERR "write : %d byte(s) not copy_from_user\n", uncopied);
-        return -EFAULT;
-    }
-    printk(KERN_INFO "copied to kernel : size = %ld, %s\n", size, write_buf);
-    return size;
-}
-
-static long 
-ku_ioctl(struct file *fp, unsigned int cmd, unsigned long arg)
-{
-	printk(KERN_INFO "ku ioctl\n");
-	return 0;
-}
-
 static int 
 create_devfiles(void)
 {
@@ -184,6 +126,7 @@ create_devfiles(void)
             class_destroy(cls);
             return -1;
         }
+        printk(KERN_ERR "Dev %s%d has been created\n", DEVNAME, i);
     }  
     return 0;
 }

@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 import sys, os
-module = "kernel_user"
+module = "kumod"
 load_cmd = "sudo insmod " + module + ".ko"
 unload_cmd = "sudo rmmod " + module
 log_cmd = "dmesg"

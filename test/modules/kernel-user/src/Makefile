@@ -1,10 +1,11 @@
 ##此处表示编写在本机上使用的，交叉编译器进行交叉编译，此处也需要改变。
 KVERS=/usr/src/kernels/3.10.0-1160.36.2.el7.x86_64/
 
-obj-m += kernel_user.o
+obj-m += kumod.o
+kumod-objs := kernel_user.o entry_points.o
 
 #Specify flags for the module compilation
-EXTRA_CFLAGS = -g -o0
+EXTRA_CFLAGS = -g -o0 -Wall
 
 build: kernel_modules
 
