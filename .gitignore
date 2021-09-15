@@ -11,6 +11,7 @@ core*
 *.ko
 *.cmd
 *.mod
+*.so
 *tmp_versions*
 temp/Makefile_test/tags
 temp/memsize_of_point_test
@@ -115,3 +116,4 @@ test/hook/ptrace-inject/traced
 test/hook/ptrace-inject/ptrace_inject
 test/hook/ptrace-write/traced
 test/hook/ptrace-write/ptrace_write
+test/hook/malloc-free/main

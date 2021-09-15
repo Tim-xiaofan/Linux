@@ -13,7 +13,7 @@
 int main(int ac, char * av[])
 {
     int i;
-    for(i = 0;i < 100; ++i) 
+    for(i = 0;i < 1000; ++i) 
     {
         printf("My(pid = %d) counter: %d\n",getpid(),  i);
         sleep(2);

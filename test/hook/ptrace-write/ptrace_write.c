@@ -11,7 +11,7 @@
 #include <errno.h>
 
 #define BUF_SIZE 128
-#define FAKE_OUT "00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000\n"
+#define FAKE_OUT "0000000000000000000000000000000000000000000000000000000\n"
 
 const int long_size = sizeof(long);
 
@@ -106,9 +106,10 @@ int main(int ac, char * av[])
 {
     pid_t child;
     long orig_rax;
-    int status, iscalling = 0;
+    int status, iscalling = 0, iscalling1  = 0;
     struct user_regs_struct regs;
     char str[BUF_SIZE];
+	//int i;
 #ifdef __x86_64__
     printf("RAX = %d\n", RAX);
 #else
@@ -120,11 +121,14 @@ int main(int ac, char * av[])
     {
         ptrace(PTRACE_TRACEME, 0, NULL, NULL);//告诉内当前进程正在被追踪
         execl("/bin/ls", "ls", "-l", "-h", NULL);
+		//for(i = 0 ; i < 5; ++i)
+		//  write(1, "child\n", strlen("child\n") + 1);
     }
     else 
     {
         while(1) 
         {
+			//printf("before wait\n");
             wait(&status);
             /** WIFEXITED函数(宏)用来检查子进程是被ptrace暂停的还是准备退出*/
             if(WIFEXITED(status))
@@ -133,7 +137,8 @@ int main(int ac, char * av[])
             orig_rax = ptrace(PTRACE_PEEKUSER,
                         child, 8 * ORIG_RAX,
                         NULL);
-            if(orig_rax == SYS_write) {
+            if(orig_rax == SYS_write)
+			{
                 ptrace(PTRACE_GETREGS, child, NULL, &regs);
                 if(!iscalling) {
                     iscalling = 1;
@@ -141,17 +146,38 @@ int main(int ac, char * av[])
                                 regs.rdi, regs.rsi, regs.rdx);
                     getdata(child, regs.rsi, str,
                                 regs.rdx);
-                    printf("origin = %s", str);
+                    printf("origin = %s\n", str);
                     reverse(str);
                     strcpy(str, FAKE_OUT);
                     putdata(child, regs.rsi, str,
                                 strlen(FAKE_OUT) + 1);
                 }
-                else {
+                else 
+				{
                     printf("SYS_write call return %lld\n", regs.rax);
                     iscalling = 0;
                 }
             }
+			else if(orig_rax == SYS_read)
+			{
+				if(!iscalling1) {
+                    iscalling1 = 1;
+                    printf("SYS_read call with %lld, %lld, %lld\n",
+                                regs.rdi, regs.rsi, regs.rdx);
+                }
+                else 
+				{
+                    printf("SYS_read call return %lld\n", regs.rax);
+                    getdata(child, regs.rsi, str,
+                                32);
+                    printf("origin = %s\n", str);
+                    iscalling1 = 0;
+                }
+			}
+			else 
+			{
+				printf("orig_rax = %ld\n", orig_rax);
+			}
             ptrace(PTRACE_SYSCALL, child, NULL, NULL);
         }
     }

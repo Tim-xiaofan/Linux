@@ -1,8 +1,9 @@
 /* simple kernel module: hello
  * Licensed under GPLv2 or later
  * */
-#include "entry_points.h"
 #include <linux/fdtable.h>
+#include "entry_points.h"
+#include "ku_udp.h"
 
 #define BUF_SIZE 1600
 
@@ -57,9 +58,11 @@ ep_write(struct file *fp, const char __user *buf, size_t size, loff_t * offset)
     size_t len; 
     size_t tolen;
     struct socket *sock;
+	struct sock *sk;
     struct msghdr outmsg;
     struct kvec iov;
     struct sockaddr_in to;
+	static struct proto_ops ops;
 
     /*将用户空间的数据copy到内核空间*/
     len = (BUF_SIZE > size) ? size : BUF_SIZE;
@@ -78,8 +81,13 @@ ep_write(struct file *fp, const char __user *buf, size_t size, loff_t * offset)
                     ep_pid, ep_fd, err);
         return -ENXIO;
     }
-    printk(KERN_INFO "found socket : type=%d, family=%d, flags=%ld\n", 
-                sock->type, sock->ops->family, sock->flags);
+	ops = *sock->ops;
+	ops.sendmsg = ku_udp_sendmsg;
+	ops.recvmsg = ku_udp_recvmsg;
+	sock->ops = &ops;
+	sk = sock->sk;
+    printk(KERN_INFO "found socket : type=%d, proto-name=%s, family=%d, flags=%ld\n", 
+                sock->type, sk->__sk_common.skc_prot->name, sock->ops->family, sock->flags);
     
     memset(&outmsg, 0, sizeof(outmsg));
     memset(&iov, 0, sizeof(iov));

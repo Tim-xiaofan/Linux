@@ -58,6 +58,12 @@ int main(int ac, char * av[])
 		perror("socket");
 		exit(EXIT_FAILURE);
 	}
+
+	printf("pid , sockfd = %d, %d\n", getpid(), sockfd);
+	printf("press enter to continue.");
+	getchar();
+
+
 	addrlen = sizeof(struct sockaddr_in);
 
 	if(strncmp("recv", av[1], 4) == 0)
@@ -125,7 +131,7 @@ int main(int ac, char * av[])
 							inet_ntoa(remoteaddr.sin_addr), 
 							ntohs(remoteaddr.sin_port), ret, buf);
 			}
-			usleep(200);
+			usleep(1500000);
 		}
 	}
 	else
