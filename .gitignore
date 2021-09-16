@@ -117,3 +117,9 @@ test/hook/ptrace-inject/ptrace_inject
 test/hook/ptrace-write/traced
 test/hook/ptrace-write/ptrace_write
 test/hook/malloc-free/main
+ch-15 UDP Net Programming/p2p/hook-recvfrom/main
+test/hook/hook-malloc-free/main
+test/hook/LD_PRELOAD/main
+test/hook/hook-send/main
+test/hook/hook-recvfrom/main
+test/hook/ptrace-other/ptrace_other

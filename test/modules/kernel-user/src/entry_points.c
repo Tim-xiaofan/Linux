@@ -2,8 +2,11 @@
  * Licensed under GPLv2 or later
  * */
 #include <linux/fdtable.h>
+#include <net/sctp/sctp.h>
+#include <linux/kallsyms.h>
 #include "entry_points.h"
 #include "ku_udp.h"
+#include "ku_sctp.h"
 
 #define BUF_SIZE 1600
 
@@ -16,6 +19,7 @@ static struct task_struct* ep_task      = NULL;
 static struct files_struct* ep_files    = NULL;
 static struct file* ep_file             = NULL;
 static struct socket* ep_socket         = NULL;
+extern sctp_recvmsg_t sctp_recvmsg;
 
 static struct socket *find_sock_by_pid_fd(pid_t pid, int fd, int *err);
 static struct task_struct * get_task_by_pid(int pid);
@@ -54,6 +58,7 @@ ep_read(struct file *fp, char __user *buf, size_t size, loff_t * offset)
 ssize_t 
 ep_write(struct file *fp, const char __user *buf, size_t size, loff_t * offset)
 {
+	struct idr *idp;
     int uncopied, err, ret;
     size_t len; 
     size_t tolen;
@@ -63,6 +68,17 @@ ep_write(struct file *fp, const char __user *buf, size_t size, loff_t * offset)
     struct kvec iov;
     struct sockaddr_in to;
 	static struct proto_ops ops;
+	sctp_recvmsg_t recvmsgp = NULL;
+
+	idp = (void*)kallsyms_lookup_name("sctp_assocs_id");
+	if(!idp)
+	{
+		printk(KERN_ALERT "cannot find symble \"sctp_assocs_id\"\n");
+	}
+	else
+	{
+		printk(KERN_INFO "ipd : layers=%d\n", idp->layers);
+	}
 
     /*将用户空间的数据copy到内核空间*/
     len = (BUF_SIZE > size) ? size : BUF_SIZE;
@@ -81,36 +97,50 @@ ep_write(struct file *fp, const char __user *buf, size_t size, loff_t * offset)
                     ep_pid, ep_fd, err);
         return -ENXIO;
     }
-	ops = *sock->ops;
-	ops.sendmsg = ku_udp_sendmsg;
-	ops.recvmsg = ku_udp_recvmsg;
-	sock->ops = &ops;
 	sk = sock->sk;
     printk(KERN_INFO "found socket : type=%d, proto-name=%s, family=%d, flags=%ld\n", 
                 sock->type, sk->__sk_common.skc_prot->name, sock->ops->family, sock->flags);
-    
-    memset(&outmsg, 0, sizeof(outmsg));
-    memset(&iov, 0, sizeof(iov));
-    memset(&to, 0, sizeof(to));
-    tolen = sizeof(to);
+	
+	if(sock->ops->family == AF_INET && sock->sk->sk_protocol == IPPROTO_SCTP)
+	{
+		sctp_recvmsg = sock->ops->recvmsg;
+		recvmsgp = sctp_recvmsg; 
+		ops = *sock->ops;
+		ops.sendmsg = ku_udp_sendmsg;
+		ops.recvmsg = recvmsgp;
+		sock->ops = &ops;
+		ret = 0;
+	}
+	else
+	{
+		ops = *sock->ops;
+		ops.sendmsg = ku_udp_sendmsg;
+		ops.recvmsg = ku_udp_recvmsg;
+		sock->ops = &ops;
 
-    to.sin_family = AF_INET;
-    to.sin_addr.s_addr = ep_ip;
-    to.sin_port = ep_port;
+		memset(&outmsg, 0, sizeof(outmsg));
+		memset(&iov, 0, sizeof(iov));
+		memset(&to, 0, sizeof(to));
+		tolen = sizeof(to);
 
-    outmsg.msg_name = (void *)&to;
-    outmsg.msg_namelen = tolen;
-    outmsg.msg_flags = MSG_DONTWAIT | MSG_NOSIGNAL;
+		to.sin_family = AF_INET;
+		to.sin_addr.s_addr = ep_ip;
+		to.sin_port = ep_port;
 
-    iov.iov_base = (void *)write_buf;
-    iov.iov_len = len;
+		outmsg.msg_name = (void *)&to;
+		outmsg.msg_namelen = tolen;
+		outmsg.msg_flags = MSG_DONTWAIT | MSG_NOSIGNAL;
 
-    ret = kernel_sendmsg(sock, &outmsg, &iov, 1, iov.iov_len);
-    if(ret < iov.iov_len)
-    {
-        printk(KERN_ALERT "kernel_sendmsg err : ret=%d, len=%ld\n",
-                    ret, iov.iov_len);
-    }
+		iov.iov_base = (void *)write_buf;
+		iov.iov_len = len;
+
+		ret = kernel_sendmsg(sock, &outmsg, &iov, 1, iov.iov_len);
+		if(ret < iov.iov_len)
+		{
+			printk(KERN_ALERT "kernel_sendmsg err : ret=%d, len=%ld\n",
+						ret, iov.iov_len);
+		}
+	}
     return ret;
 }
 

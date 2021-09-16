@@ -30,13 +30,19 @@ void signal_handle(int signum)
 	}
 }
 
-int main()
+int main(int ac, char *av[])
 {
 	int connSock, in, flags, ret;
 	struct sockaddr_in servaddr;
 	struct sctp_sndrcvinfo sndrcvinfo;
 	struct sctp_event_subscribe events;
 	char buffer[MAX_BUFFER + 1];
+	
+	if(ac != 3)
+	{
+		printf("Usage : ./prog <addr> <port>\n");
+		exit(EXIT_FAILURE);
+	}
 
 	signal(SIGINT, signal_handle);
 	
@@ -51,10 +57,20 @@ int main()
 	/* Specify the peer endpoint to which we'll connect */
 	bzero((void *)&servaddr, sizeof(servaddr));
 	servaddr.sin_family = AF_INET;
-	servaddr.sin_port = htons(MY_PORT_NUM);
-	servaddr.sin_addr.s_addr = inet_addr("127.0.0.1");
+	servaddr.sin_addr.s_addr = inet_addr(av[1]);
+	servaddr.sin_port = htons(atoi(av[2]));
+
+	/* Enable receipt of SCTP Snd/Rcv Data via sctp_recvmsg */
+	memset((void *)&events, 0, sizeof(events));
+	events.sctp_data_io_event = 1;
+	ret = setsockopt(connSock, SOL_SCTP, SCTP_EVENTS,
+			   (const void *)&events, sizeof(events));
+
 	/* Connect to the server */
 	ret = connect(connSock, (struct sockaddr *)&servaddr, sizeof(servaddr));
+	printf("pid sockfd : %d, %d\n", getpid(), connSock);
+	//printf("press enter to cotinue.\n");
+	//getchar();
 	if(ret == -1)
 	{
 		perror("connect");
@@ -62,11 +78,6 @@ int main()
 	}
 	printf("connect success to %s, port %d, sock %d\n", inet_ntoa(servaddr.sin_addr), ntohs(servaddr.sin_port), connSock);
 	
-	/* Enable receipt of SCTP Snd/Rcv Data via sctp_recvmsg */
-	memset((void *)&events, 0, sizeof(events));
-	events.sctp_data_io_event = 1;
-	ret = setsockopt(connSock, SOL_SCTP, SCTP_EVENTS,
-			   (const void *)&events, sizeof(events));
 	if(ret == -1)
 	{
 		perror("setsockopt ");

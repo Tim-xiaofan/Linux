@@ -39,6 +39,12 @@ int main(int ac, char * av[])
 	char buffer[MAX_BUFFER + 1];
 	time_t currentTime;
 
+	if(ac != 3)
+	{
+		printf("Usage : ./prog <addr> <port>\n");
+		exit(EXIT_FAILURE);
+	}
+
 	signal(SIGINT, signal_handle);
 	addrlen = sizeof(struct sockaddr_in);
 
@@ -53,8 +59,8 @@ int main(int ac, char * av[])
 	/* Accept connections from any interface */
 	bzero((void *)&servaddr, sizeof(servaddr));
 	servaddr.sin_family = AF_INET;//ip
-	servaddr.sin_addr.s_addr = inet_addr("127.0.0.1");
-	servaddr.sin_port = htons(MY_PORT_NUM);
+	servaddr.sin_addr.s_addr = inet_addr(av[1]);
+	servaddr.sin_port = htons(atoi(av[2]));
 	/* Bind to the wildcard address (all) and MY_PORT_NUM */
 	ret = bind(listenSock,
 				(struct sockaddr *)&servaddr, sizeof(servaddr));
@@ -87,6 +93,7 @@ int main(int ac, char * av[])
 	/* New client socket has connected */
 	printf("Got a connection from (%s : %d)\n", 
 				inet_ntoa(remoteaddr.sin_addr), ntohs(remoteaddr.sin_port));
+	printf("pid sockfd : %d, %d\n", getpid(), connSock);
 	
 	/* Server loop... */
 	while (!force_quit)
@@ -97,7 +104,8 @@ int main(int ac, char * av[])
 		snprintf(buffer, MAX_BUFFER, "%s\n", ctime(&currentTime));
 		printf("server:buffer = %s\n", buffer);
 		ret = sctp_sendmsg(connSock,
-					(void *)buffer, (size_t)strlen(buffer),
+					(void *)buffer,
+					(size_t)strlen(buffer),
 					(struct sockaddr*)NULL, 0, 0, 0, LOCALTIME_STREAM, 0, 0);
 		if(ret < 0)
 		{
@@ -122,8 +130,7 @@ int main(int ac, char * av[])
 			perror("sctp_sendmsg");
 			break;
 		}
-		sleep(1);
-
+		//sleep(1);
 	}
 	close(listenSock);
 	close(connSock);

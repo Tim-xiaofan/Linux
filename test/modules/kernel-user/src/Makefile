@@ -2,7 +2,7 @@
 KVERS=/usr/src/kernels/3.10.0-1160.36.2.el7.x86_64/
 
 obj-m += kumod.o
-kumod-objs := kernel_user.o entry_points.o ku_udp.o
+kumod-objs := kernel_user.o entry_points.o ku_udp.o ku_sctp.o
 
 #Specify flags for the module compilation
 EXTRA_CFLAGS = -g -o0 -Wall
