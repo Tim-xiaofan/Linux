@@ -91,8 +91,10 @@ int main(int ac, char * av[])
 	connSock = accept(listenSock,
 				(struct sockaddr *)&remoteaddr, (socklen_t *)&addrlen);
 	/* New client socket has connected */
-	printf("Got a connection from (%s : %d)\n", 
-				inet_ntoa(remoteaddr.sin_addr), ntohs(remoteaddr.sin_port));
+	printf("Got a connection from (%s : %d), sock=%d\n", 
+				inet_ntoa(remoteaddr.sin_addr), 
+				ntohs(remoteaddr.sin_port),
+				connSock);
 	printf("pid sockfd : %d, %d\n", getpid(), connSock);
 	
 	/* Server loop... */
@@ -102,7 +104,7 @@ int main(int ac, char * av[])
 		currentTime = time(NULL);
 		/* Send local time on stream 0 (local time stream) */
 		snprintf(buffer, MAX_BUFFER, "%s\n", ctime(&currentTime));
-		printf("server:buffer = %s\n", buffer);
+		//printf("server:buffer = %s\n", buffer);
 		ret = sctp_sendmsg(connSock,
 					(void *)buffer,
 					(size_t)strlen(buffer),
@@ -112,7 +114,7 @@ int main(int ac, char * av[])
 			perror("sctp_sendmsg");
 			break;
 		}
-		/* Send GMT on stream 1 (GMT stream) */
+		/*Send GMT on stream 1 (GMT stream) */
 		snprintf(buffer, MAX_BUFFER, "%s\n",
 					asctime(gmtime(&currentTime)));
 		ret = sctp_sendmsg(connSock,
@@ -130,7 +132,7 @@ int main(int ac, char * av[])
 			perror("sctp_sendmsg");
 			break;
 		}
-		//sleep(1);
+		sleep(1);
 	}
 	close(listenSock);
 	close(connSock);

@@ -12,6 +12,7 @@ core*
 *.cmd
 *.mod
 *.so
+*.c~
 *tmp_versions*
 temp/Makefile_test/tags
 temp/memsize_of_point_test

@@ -1,1 +1,1 @@
-sudo ./user /dev/kudev0 10.10.0.35 2200 12447  3
+sudo ./user /dev/kudev0 127.0.0.1 1100 28003 3

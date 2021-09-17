@@ -84,6 +84,7 @@ static void __exit
 ku_exit(void)
 {
     destroy_devfiles();
+	ep_recover();
 	printk(KERN_INFO "ku exit.\n");
 	if(fops_registered)
 	{

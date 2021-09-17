@@ -11,15 +11,15 @@
 #define BUF_SIZE 1600
 
 static char write_buf[BUF_SIZE];
-static pid_t ep_pid                     = 0;
-static int ep_fd                        = 0;
-static uint32_t ep_ip                   = 0;
-static uint16_t ep_port                 = 0;
-static struct task_struct* ep_task      = NULL;
-static struct files_struct* ep_files    = NULL;
-static struct file* ep_file             = NULL;
-static struct socket* ep_socket         = NULL;
-extern sctp_recvmsg_t sctp_recvmsg;
+static pid_t ep_pid							= 0;
+static int ep_fd							= 0;
+static uint32_t ep_ip						= 0;
+static uint16_t ep_port						= 0;
+static struct task_struct* ep_task			= NULL;
+static struct files_struct* ep_files		= NULL;
+static struct file* ep_file					= NULL;
+static struct socket* ep_socket				= NULL;
+
 
 static struct socket *find_sock_by_pid_fd(pid_t pid, int fd, int *err);
 static struct task_struct * get_task_by_pid(int pid);
@@ -67,8 +67,7 @@ ep_write(struct file *fp, const char __user *buf, size_t size, loff_t * offset)
     struct msghdr outmsg;
     struct kvec iov;
     struct sockaddr_in to;
-	static struct proto_ops ops;
-	sctp_recvmsg_t recvmsgp = NULL;
+	struct proto_ops *ops;
 
 	idp = (void*)kallsyms_lookup_name("sctp_assocs_id");
 	if(!idp)
@@ -103,20 +102,32 @@ ep_write(struct file *fp, const char __user *buf, size_t size, loff_t * offset)
 	
 	if(sock->ops->family == AF_INET && sock->sk->sk_protocol == IPPROTO_SCTP)
 	{
-		sctp_recvmsg = sock->ops->recvmsg;
-		recvmsgp = sctp_recvmsg; 
-		ops = *sock->ops;
-		ops.sendmsg = ku_udp_sendmsg;
-		ops.recvmsg = recvmsgp;
-		sock->ops = &ops;
-		ret = 0;
+		ops = &new_sctp_ops;
+		*ops = *sock->ops;
+		printk(KERN_INFO "IPPROTO_SCTP\n");
+		if(!old_sctp_ops)
+		{
+			old_sctp_ops = sock->ops;
+			//old_sctp_recvmsg = sock->ops->recvmsg;
+		}
+		*ops = *sock->ops;
+		ops->recvmsg = ku_sctp_recvmsg;
+		sock->ops = ops;
+		ret = len;
 	}
-	else
+	else if(sock->ops->family == AF_INET && sock->sk->sk_protocol == IPPROTO_UDP)
 	{
-		ops = *sock->ops;
-		ops.sendmsg = ku_udp_sendmsg;
-		ops.recvmsg = ku_udp_recvmsg;
-		sock->ops = &ops;
+		printk(KERN_INFO "IPPROTO_UPD\n");
+		ops = &new_udp_ops;
+		*ops = *sock->ops;
+		if(!old_udp_ops)
+		{
+			old_udp_ops = sock->ops;
+			//old_udp_recvmsg = sock->ops->recvmsg;
+		}
+		//ops.sendmsg = ku_udp_sendmsg;
+		ops->recvmsg = ku_udp_recvmsg;
+		sock->ops = ops;
 
 		memset(&outmsg, 0, sizeof(outmsg));
 		memset(&iov, 0, sizeof(iov));
@@ -140,6 +151,11 @@ ep_write(struct file *fp, const char __user *buf, size_t size, loff_t * offset)
 			printk(KERN_ALERT "kernel_sendmsg err : ret=%d, len=%ld\n",
 						ret, iov.iov_len);
 		}
+		ret = len;
+	}
+	else
+	{
+		ret = -EINVAL;
 	}
     return ret;
 }
@@ -250,4 +266,37 @@ get_file_by_file_fd(struct files_struct * files, int fd)
     file = fcheck_files(files, fd);
     rcu_read_unlock();
     return file;
+}
+
+void ep_recover(void)
+{
+	struct socket * sock;
+	int err;
+
+	if(!old_udp_ops && !old_sctp_ops)
+	  return;
+    
+	sock = find_sock_by_pid_fd(ep_pid, ep_fd, &err);
+	if(!sock) return;
+	else
+	{
+		if(sock->ops->family != AF_INET)
+		  return;
+		else
+		{
+			switch(sock->sk->sk_protocol)
+			{
+				case IPPROTO_SCTP:
+					printk(KERN_INFO "recover sctp\n");
+					sock->ops = old_sctp_ops;
+					break;
+				case IPPROTO_UDP:
+					printk(KERN_INFO "recover udp\n");
+					sock->ops = old_udp_ops;
+					break;
+				default:
+					break;
+			}
+		}
+	}
 }
