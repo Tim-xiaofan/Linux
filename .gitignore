@@ -13,6 +13,9 @@ core*
 *.mod
 *.so
 *.c~
+*.sh~
+*.xz
+*.gz
 *tmp_versions*
 temp/Makefile_test/tags
 temp/memsize_of_point_test
