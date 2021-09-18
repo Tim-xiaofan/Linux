@@ -83,15 +83,18 @@ ku_init(void)
 static void __exit 
 ku_exit(void)
 {
+	//int i;
+	//for(i = 0 ; i < 1000; ++i)
+	//  printk(KERN_INFO "start ku exit.\n");
     destroy_devfiles();
-	ep_recover();
-	printk(KERN_INFO "ku exit.\n");
+	//ep_recover();
 	if(fops_registered)
 	{
 		unregister_chrdev_region(MKDEV(major, minor), count);
 		cdev_del(kudev);
 		fops_registered = 0;
 	}
+	printk(KERN_INFO "finish ku exit.\n");
 }
 
 static int 

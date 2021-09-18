@@ -179,6 +179,7 @@ int main(int ac, char *av[])
 			perror("write");
 			break;
 		}
+		//break;
 		usleep(1000000);
 	}
 
