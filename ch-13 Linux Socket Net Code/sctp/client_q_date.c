@@ -31,7 +31,7 @@ void signal_handle(int signum)
 	}
 }
 
-static int 
+int 
 recored(const char * filename, pid_t pid, int sockfd)
 {
 	FILE *fp = fopen(filename, "w");

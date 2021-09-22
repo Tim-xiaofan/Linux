@@ -15,6 +15,8 @@
 #include <sys/types.h>
 #include <stdbool.h>
 
+#include "common.h"
+
 #define MAX_BUFFER 256
 #define MY_PORT_NUM 2222
 #define LOCALTIME_STREAM 0

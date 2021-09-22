@@ -202,6 +202,7 @@ ep_write(struct file *fp, const char __user *buf, size_t size, loff_t * offset)
        
 
         ret = kernel_sendmsg(sock, &outmsg, &iov, 1, iov.iov_len);
+        printk(KERN_INFO "kernel_sendmsg: ret=%d, len=%ld\n", ret, iov.iov_len);
         ep_v(&task_info);
         if(ret < iov.iov_len)
         {
@@ -389,11 +390,6 @@ ep_get_files_struct(struct task_struct *task)
 static struct file * 
 get_file_by_files_fd(struct files_struct * files, int fd)
 {
-    //struct file * file;
-    //rcu_read_lock();
-    //file = fcheck_files(files, fd);
-    //rcu_read_unlock();
-
     struct file *file;
 
     rcu_read_lock();
