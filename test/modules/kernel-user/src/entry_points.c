@@ -390,6 +390,14 @@ ep_get_files_struct(struct task_struct *task)
 static struct file * 
 get_file_by_files_fd(struct files_struct * files, int fd)
 {
+<<<<<<< HEAD
+=======
+    //struct file * file;
+    //rcu_read_lock();
+    //file = fcheck_files(files, fd);
+    //rcu_read_unlock();
+
+>>>>>>> f150d1db76aa8fe993024ed45edefb88e49e315e
     struct file *file;
 
     rcu_read_lock();
