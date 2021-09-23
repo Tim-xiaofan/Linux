@@ -13,6 +13,7 @@ core*
 *.mod
 *.so
 *.c~
+*~
 *.sh~
 *.xz
 *.gz
