@@ -34,12 +34,11 @@ init_cfgs(void)
 
     for(i = 0; i < count; ++i)
     {
-        //2638 3
-        cfgs.configs[i].pid = 2114;
-        cfgs.configs[i].fd = 3;
+        cfgs.configs[i].pid = 2010;
+        cfgs.configs[i].fd = 4;
         sprintf(ip, "127.0.0.%d", i + 1);
         cfgs.configs[i].ip = inet_addr(ip);
-        cfgs.configs[i].port = htons(1100);
+        cfgs.configs[i].port = htons(41927);
     }
     return 0;
 }
@@ -145,7 +144,7 @@ mod_config(int ac, char *av[])
     i = 0;
     while(lst[i])
     {
-        printf("%s", lst[i]);
+        printf("%s\n", lst[i]);
         i++;
     }
     for(i = 0; i < 10; ++i)
@@ -199,18 +198,16 @@ int main(int ac, char *av[])
 		}
 		//break;
 		usleep(1000000);
-        break;
 	}
-    //goto done;
 
-	//ret = read(devfd, buf, BUF_SIZE);
-	//if(ret < 0){
-	//	perror("read");
-	//}
-	//else
-	//{
-	//	printf("data from kernel : %s\n",buf);
-	//}
+	ret = read(devfd, buf, BUF_SIZE);
+	if(ret < 0){
+		perror("read");
+	}
+	else
+	{
+		printf("data from kernel : %s\n",buf);
+	}
 
 
 done:

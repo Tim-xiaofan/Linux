@@ -15,5 +15,31 @@
 #define IOCGIP      _IOR(IOC_MAGIC, 2, int)
 #define IOCSPORT    _IOW(IOC_MAGIC, 3, int)
 #define IOCGPORT    _IOR(IOC_MAGIC, 3, int)
+#define IOCSONOFF   _IOW(IOC_MAGIC, 4, int)
+#define IOCGONOFF   _IOR(IOC_MAGIC, 4, int)
+#define IOCSCONFIGS _IOW(IOC_MAGIC, 5, int)
+#define IOCGCONFIGS _IOR(IOC_MAGIC, 5, int)
+#define IOCADDFILTER _IOW(IOC_MAGIC, 6, int)
+#define IOCLSTFILTER _IOR(IOC_MAGIC, 6, int)
+#define IOCDELFILTER _IOW(IOC_MAGIC, 7, int)
+#define IOCCLRFILTER _IOW(IOC_MAGIC, 8, int)
+
+#define KU_MAX_CONFIG 4
+#define KU_ON   1
+#define KU_OFF  0
+
+struct ku_config
+{
+    pid_t pid;
+    int fd;
+    int ip;
+    int port;
+};
+
+struct ku_configs
+{
+    int count;
+    struct ku_config configs[KU_MAX_CONFIG];
+};
 
 #endif

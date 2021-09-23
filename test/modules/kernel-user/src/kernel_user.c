@@ -7,6 +7,7 @@
 #include <linux/cdev.h>
 #include <linux/netdevice.h>
 #include "entry_points.h"
+#include "ku_sctp.h"
 
 #define DEVNAME "kudev"
 
@@ -77,6 +78,13 @@ ku_init(void)
     {
         printk(KERN_INFO "create_devfiles success\n");
     }
+    ret = ku_sctp_init();
+    if(ret == 0)
+    {
+        printk(KERN_INFO "sctp init success\n");
+    }
+
+    ep_init();
 	return ret;
 }
 
@@ -94,6 +102,7 @@ ku_exit(void)
 		cdev_del(kudev);
 		fops_registered = 0;
 	}
+    ep_exit();
 	printk(KERN_INFO "finish ku exit.\n");
 }
 

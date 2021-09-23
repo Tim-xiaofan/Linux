@@ -34,12 +34,11 @@ init_cfgs(void)
 
     for(i = 0; i < count; ++i)
     {
-        //2638 3
-        cfgs.configs[i].pid = 2114;
-        cfgs.configs[i].fd = 3;
+        cfgs.configs[i].pid = 2263;
+        cfgs.configs[i].fd = 4;
         sprintf(ip, "127.0.0.%d", i + 1);
         cfgs.configs[i].ip = inet_addr(ip);
-        cfgs.configs[i].port = htons(1100);
+        cfgs.configs[i].port = htons(49938);
     }
     return 0;
 }
@@ -199,7 +198,6 @@ int main(int ac, char *av[])
 		}
 		//break;
 		usleep(1000000);
-        break;
 	}
     //goto done;
 

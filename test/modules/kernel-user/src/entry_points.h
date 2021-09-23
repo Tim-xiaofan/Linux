@@ -17,5 +17,7 @@ ssize_t ep_read(struct file *fp, char __user *buf, size_t size, loff_t * offset)
 ssize_t ep_write(struct file *fp, const char __user *buf, size_t size, loff_t * offset);
 long ep_ioctl(struct file *fp, unsigned int cmd, unsigned long arg);
 void ep_recover(void);
+void ep_exit(void);
+void ep_init(void);
 
 #endif

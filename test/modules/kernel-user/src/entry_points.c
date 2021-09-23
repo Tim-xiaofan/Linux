@@ -15,15 +15,26 @@
 #define BUF_SIZE 1600
 
 static char write_buf[BUF_SIZE];
-static pid_t ep_pid                         = 0;
-static int ep_fd                            = 0;
-static uint32_t ep_ip                       = 0;
-static uint16_t ep_port                     = 0;
-//static struct task_struct* ep_task            = NULL;
-//static struct files_struct* ep_files      = NULL;
-//static struct file* ep_file                   = NULL;
-//static struct socket* ep_socket               = NULL;
+//static pid_t ep_pid                         = 0;
+//static int ep_fd                            = 0;
+//static uint32_t ep_ip                       = 0;
+//static uint16_t ep_port                     = 0;
+static int ep_default_link                  = 0;
+int ep_work                                 = 0;
 
+#define MAX_FILTER_NUM 10
+#define MAX_FILTER_SZ  32
+
+struct ep_configs
+{
+    int filter_ct, ref;
+    char *filters[MAX_FILTER_NUM];
+    struct ku_configs ku_cfgs;
+};
+
+static struct ep_configs ep_cfgs;
+static int ep_del_filter(int index);
+static void ep_show_filter(void);
 
 struct task_info
 {
@@ -56,18 +67,55 @@ static void ep_put_task_struct(struct task_struct * task);
 #define files_unlock(x) spin_unlock(&(x)->file_lock)
 #define file_unlock(x) spin_unlock(&(x)->f_lock)
 
+static void print_configs(const struct ku_configs * cfgs);
+
+void 
+ep_init(void)
+{
+    int i;
+    for(i = 0; i < MAX_FILTER_NUM; ++i)
+      ep_cfgs.filters[i] = 
+          kzalloc(MAX_FILTER_SZ * sizeof(char), GFP_KERNEL);
+    ep_cfgs.filter_ct = 0;
+    ep_cfgs.ref = 0;
+    ep_cfgs.ku_cfgs.count = 0;
+    printk("ep_init\n");
+}
+
+void
+ep_exit(void)
+{
+    int i;
+    for(i = 0; i < MAX_FILTER_NUM; ++i)
+      kfree(ep_cfgs.filters[i]);
+    ep_cfgs.filter_ct = 0;
+    printk("ep_exit\n");
+}
+
 int 
 ep_open(struct inode *node, struct file *fp)
 {
     printk(KERN_INFO "ep open\n");
+    ++ep_cfgs.ref;
     return 0;
 }
 
 int 
 ep_release(struct inode *node, struct file *fp)
 {
+    int i;
     printk(KERN_INFO "ep release\n");
-    ep_recover();
+
+    //for(i = 0; i < MAX_FILTER_NUM; ++i)
+    //  kfree(ep_cfgs.filters[i]);
+    //ep_cfgs.filter_ct = 0;
+    if(ep_cfgs.ref > 0) --ep_cfgs.ref;
+    if(!ep_cfgs.ref)
+    {
+        for(i = 0; i < SCTP_MAX_ASSOC; ++i)
+          ku_sctpops_list.list[i].old_sctp_ops = NULL;
+        ep_recover();
+    }
     return 0;
 }
 
@@ -122,7 +170,6 @@ show_proto_ops(const struct proto_ops * ops)
 ssize_t 
 ep_write(struct file *fp, const char __user *buf, size_t size, loff_t * offset)
 {
-    struct idr *idp;
     int uncopied, err, ret;
     size_t len; 
     size_t tolen;
@@ -134,14 +181,15 @@ ep_write(struct file *fp, const char __user *buf, size_t size, loff_t * offset)
     //struct proto_ops *ops;
     task_info_t task_info;
 
-    idp = (void*)kallsyms_lookup_name("sctp_assocs_id");
-    if(!idp)
+    printk("ep_write : len = %ld\n", size);
+    
+
+    /** check*/
+    print_configs(&ep_cfgs.ku_cfgs);
+    if(ep_cfgs.ku_cfgs.count == 0)
     {
-        printk(KERN_ALERT "cannot find symble \"sctp_assocs_id\"\n");
-    }
-    else
-    {
-        printk(KERN_INFO "ipd : layers=%d\n", idp->layers);
+        printk(KERN_ERR " ku config not set\n");
+        return -ENXIO;
     }
 
     /*将用户空间的数据copy到内核空间*/
@@ -154,44 +202,43 @@ ep_write(struct file *fp, const char __user *buf, size_t size, loff_t * offset)
     }
     printk(KERN_INFO "copied to kernel : len=%ld, %s\n", len, write_buf);
     memset(&task_info, 0, sizeof(task_info));
-    sock = find_sock_by_pid_fd(ep_pid, ep_fd, &err, &task_info);
+    sock = find_sock_by_pid_fd(ep_cfgs.ku_cfgs.configs[ep_default_link].pid,
+                ep_cfgs.ku_cfgs.configs[ep_default_link].fd, &err, &task_info);
     if(!sock)
     {
         printk(KERN_ALERT "find_sock_by_pid_fd failed : "
                     "pid=%d, fd=%d, err=%d\n", 
-                    ep_pid, ep_fd, err);
+                    ep_cfgs.ku_cfgs.configs[ep_default_link].pid, 
+                    ep_cfgs.ku_cfgs.configs[ep_default_link].fd, err);
         return -ENXIO;
     }
+    //ep_v(&task_info);
+    //return -ENXIO;
     sk = sock->sk;
     printk(KERN_INFO "found socket : type=%d, proto-name=%s, family=%d, flags=%ld\n", 
                 sock->type, sk->__sk_common.skc_prot->name, sock->ops->family, sock->flags);
+
 
     if(sock->ops->family == AF_INET && sock->sk->sk_protocol == IPPROTO_SCTP)
     {
         //ops = &new_sctp_ops;
         printk(KERN_INFO "IPPROTO_SCTP\n");
-        if(!old_sctp_ops)
+        if(!origin_sctp_ops || true)
         {
+            printk(KERN_INFO "SCTP OPS REPLACE\n");
+            //ep_v(&task_info);
             ep_replace();
-            //old_sctp_ops = sock->ops;
-            //printk(KERN_INFO "backup : sock->ops = %p --> old_sctp_ops = %p", sock->ops, old_sctp_ops);
-            //printk(KERN_INFO "=========sock->ops======\n");
-            //show_proto_ops(sock->ops);
-            //printk(KERN_INFO "=========old_sctp_ops======\n");
-            //show_proto_ops(old_sctp_ops);
-            //old_sctp_recvmsg = sock->ops->recvmsg;
         }
-        //*ops = *sock->ops;
-        //ops->recvmsg = ku_sctp_recvmsg;
-        //sock->ops = ops;
         memset(&outmsg, 0, sizeof(outmsg));
         memset(&iov, 0, sizeof(iov));
         memset(&to, 0, sizeof(to));
         tolen = sizeof(to);
 
         to.sin_family = AF_INET;
-        to.sin_addr.s_addr = ep_ip;
-        to.sin_port = ep_port;
+        to.sin_addr.s_addr = 
+            ep_cfgs.ku_cfgs.configs[ep_default_link].ip;
+        to.sin_port = 
+            ep_cfgs.ku_cfgs.configs[ep_default_link].port;
 
         outmsg.msg_name = (void *)&to;
         outmsg.msg_namelen = tolen;
@@ -199,7 +246,7 @@ ep_write(struct file *fp, const char __user *buf, size_t size, loff_t * offset)
 
         iov.iov_base = (void *)write_buf;
         iov.iov_len = len;
-       
+
 
         ret = kernel_sendmsg(sock, &outmsg, &iov, 1, iov.iov_len);
         printk(KERN_INFO "kernel_sendmsg: ret=%d, len=%ld\n", ret, iov.iov_len);
@@ -213,42 +260,9 @@ ep_write(struct file *fp, const char __user *buf, size_t size, loff_t * offset)
     else if(sock->ops->family == AF_INET && sock->sk->sk_protocol == IPPROTO_UDP)
     {
         printk(KERN_INFO "IPPROTO_UPD\n");
-        //ops = &new_udp_ops;
-        //*ops = *sock->ops;
-        if(!old_udp_ops)
-        {
-            ep_replace();
-            //old_udp_ops = sock->ops;
-            //printk(KERN_INFO "backup: old_udp_ops = %p", old_udp_ops);
-            //old_udp_recvmsg = sock->ops->recvmsg;
-        }
-        //ops.sendmsg = ku_udp_sendmsg;
-        //ops->recvmsg = ku_udp_recvmsg;
-        //sock->ops = ops;
-
-        memset(&outmsg, 0, sizeof(outmsg));
-        memset(&iov, 0, sizeof(iov));
-        memset(&to, 0, sizeof(to));
-        tolen = sizeof(to);
-
-        to.sin_family = AF_INET;
-        to.sin_addr.s_addr = ep_ip;
-        to.sin_port = ep_port;
-
-        outmsg.msg_name = (void *)&to;
-        outmsg.msg_namelen = tolen;
-        outmsg.msg_flags = MSG_DONTWAIT | MSG_NOSIGNAL;
-
-        iov.iov_base = (void *)write_buf;
-        iov.iov_len = len;
-
         ret = kernel_sendmsg(sock, &outmsg, &iov, 1, iov.iov_len);
         ep_v(&task_info);
-        if(ret < iov.iov_len)
-        {
-            printk(KERN_ALERT "kernel_sendmsg err : ret=%d, len=%ld\n",
-                        ret, iov.iov_len);
-        }
+        ret = len;
     }
     else
     {
@@ -260,44 +274,126 @@ ep_write(struct file *fp, const char __user *buf, size_t size, loff_t * offset)
 long 
 ep_ioctl(struct file *fp, unsigned int cmd, unsigned long arg)
 {
+    int uncopied, i;
     printk(KERN_INFO "ep ioctl\n");
 
     switch(cmd)
     {
         case IOCSPID:
-            ep_pid = arg;
-            printk(KERN_INFO "ep ioctl set pid : %d\n", ep_pid);
+            //ep_pid = arg;
+            //printk(KERN_INFO "ep ioctl set pid : %d\n", ep_pid);
             break;
         case IOCGPID:
-            *(pid_t *)arg  = ep_pid;
-            printk(KERN_INFO "ep ioctl get pid : %d\n", ep_pid);
+            //*(pid_t *)arg  = ep_pid;
+            //printk(KERN_INFO "ep ioctl get pid : %d\n", ep_pid);
             break;
         case IOCSFD:
-            ep_fd = arg;
-            printk(KERN_INFO "ep ioctl set fd : %d\n", ep_fd);
+            //ep_fd = arg;
+            //printk(KERN_INFO "ep ioctl set fd : %d\n", ep_fd);
             break;
         case IOCGFD:
-            *(int *)arg = ep_fd;
-            printk(KERN_INFO "ep ioctl get fd : %d\n", ep_fd);
+            //*(int *)arg = ep_fd;
+            //printk(KERN_INFO "ep ioctl get fd : %d\n", ep_fd);
             break;
         case IOCSIP:
-            ep_ip = arg;
-            printk(KERN_INFO "ep ioctl set ip : %08x\n", ep_ip);
+            //ep_ip = arg;
+            //printk(KERN_INFO "ep ioctl set ip : %08x\n", ep_ip);
             break;
         case IOCGIP:
-            *(uint32_t *)arg = ep_ip;
-            printk(KERN_INFO "ep ioctl get ip : %08x\n", ep_ip);
+            //*(uint32_t *)arg = ep_ip;
+            //printk(KERN_INFO "ep ioctl get ip : %08x\n", ep_ip);
             break;
         case IOCSPORT:
-            ep_port = arg;
-            printk(KERN_INFO "ep ioctl set port : %04x\n", ep_port);
+            //ep_port = arg;
+            //printk(KERN_INFO "ep ioctl set port : %04x\n", ep_port);
             break;
         case IOCGPORT:
-            *(uint16_t *)arg = ep_port;
-            printk(KERN_INFO "ep ioctl get port : %04x\n", ep_port);
+            //*(uint16_t *)arg = ep_port;
+            //printk(KERN_INFO "ep ioctl get port : %04x\n", ep_port);
+            break;
+        case IOCSONOFF:
+            ep_work = arg;
+            printk(KERN_INFO "ep ioctl set work : %d\n", ep_work);
+            break;
+        case IOCGONOFF:
+            *(int*)arg = ep_work;
+            printk(KERN_INFO "ep ioctl get work : %d\n", ep_work);
+            break;
+        case IOCSCONFIGS:
+            //ep_cfgs.ku_cfgs = *(struct ku_configs *)arg;
+            uncopied = copy_from_user(&ep_cfgs.ku_cfgs,
+                        (struct ku_configs *)arg,
+                        sizeof(struct ku_configs));
+            if(uncopied)
+            {
+                printk(KERN_INFO "IOCSCONFIGS : copy_from_user failed\n");
+                return -EINVAL;
+            }
+            else
+            {
+                printk(KERN_INFO "ep ioctl set config :\n");
+                print_configs(&ep_cfgs.ku_cfgs);
+            }
+            break;
+        case IOCGCONFIGS:
+            *(struct ku_configs *)arg = ep_cfgs.ku_cfgs;
+            printk(KERN_INFO "ep ioctl get config :\n");
+            print_configs((struct ku_configs *)arg);
+            break;
+        case IOCADDFILTER:
+            if(ep_cfgs.filter_ct == MAX_FILTER_NUM)
+            {
+                printk(KERN_ERR "too many filers\n");
+                return -EINVAL;
+            }
+            uncopied = copy_from_user(ep_cfgs.filters[ep_cfgs.filter_ct++],
+                        (char *)arg , strlen((char *)arg) + 1);
+            if(uncopied)
+            {
+                printk(KERN_ERR "ep ioctl add filter : "
+                            "copy_from_user failed : uncopied = %d\n", uncopied);
+                return -EINVAL;
+            }
+            else
+            {
+                printk(KERN_INFO "ep ioctl add filter :\n");
+                //ep_show_filter();
+            }
+            break;
+        case IOCDELFILTER:
+            if(ep_cfgs.filter_ct == 0)
+              return -EINVAL;
+            else
+            {
+                if(ep_del_filter((int)arg) == -1)
+                  return -EINVAL;
+                printk(KERN_INFO "ep ioctl del filter : ct= %d : \n", 
+                            ep_cfgs.filter_ct);
+                //ep_show_filter();
+            }
+            break;
+        case IOCCLRFILTER:
+            ep_cfgs.filter_ct = 0;
+            printk(KERN_INFO "ep ioctl clear filters : %d\n", 
+                        ep_cfgs.filter_ct);
+            break;
+        case IOCLSTFILTER:
+            printk(KERN_INFO "ep ioctl list filters\n");
+            for(i = 0; i < ep_cfgs.filter_ct; ++i)
+            {
+                uncopied = copy_to_user(((char **)arg)[i], 
+                            ep_cfgs.filters[i], 
+                            strlen(ep_cfgs.filters[i]) + 1);
+                if(uncopied)
+                {
+                    printk(KERN_ERR "copy_to_user : failed");
+                    return -EINVAL;
+                }
+            }
+            ((char **)arg)[i] = NULL;
             break;
         default:
-            printk(KERN_INFO "ep ioctl invalid cmd : %d", cmd);
+            printk(KERN_INFO "ep ioctl invalid cmd : %d\n", cmd);
             return -EINVAL;
     }
     return 0;
@@ -311,6 +407,7 @@ find_sock_by_pid_fd(pid_t pid, int fd, int *err, task_info_t * task_info)
     struct files_struct *files;
     struct file * file;
     struct socket * sock;
+
     task = get_task_by_pid(pid);//lock task
     if(!task)
     {
@@ -340,6 +437,7 @@ find_sock_by_pid_fd(pid_t pid, int fd, int *err, task_info_t * task_info)
     }
     task_info->file = file;
 
+    //goto failed;
     sock = sock_from_file(file, err);
     return sock;
 failed:
@@ -415,54 +513,48 @@ static int
 ep_replace(void)
 {
     struct socket * sock;
-    int err;
+    int err, i;
     task_info_t task_info;
 
-   //if(old_udp_ops && old_sctp_ops)
-   // return 0;
-
-    //printk(KERN_INFO "recover : old_sctp_ops = %p", old_sctp_ops);
-    sock = find_sock_by_pid_fd(ep_pid, ep_fd, &err, &task_info);
-    if(!sock) return -1;
-    else
+    for(i = 0; i < ep_cfgs.ku_cfgs.count; ++i)
     {
-        if(sock->ops->family == AF_INET)
+        sock = find_sock_by_pid_fd(ep_cfgs.ku_cfgs.configs[i].pid, 
+                    ep_cfgs.ku_cfgs.configs[i].fd, &err, &task_info);
+        if(!sock) return -1;
+        else
         {
-            switch(sock->sk->sk_protocol)
+            if(sock->ops->family == AF_INET)
             {
-                case IPPROTO_SCTP:
-                    printk(KERN_INFO "replace SCTP\n");
-                    if(!old_sctp_ops)
-                    {
-                        old_sctp_ops = sock->ops;
-                        new_sctp_ops = *sock->ops;
-                        new_sctp_ops.recvmsg = ku_sctp_recvmsg;
-                        sock->ops = &new_sctp_ops;
-                        //printk(KERN_INFO "replace : sock->ops = %p --> old_sctp_ops = %p", sock->ops, old_sctp_ops);
-                        //printk(KERN_INFO "=========sock->ops======\n");
-                        //show_proto_ops(sock->ops);
-                        //printk(KERN_INFO "=========old_sctp_ops======\n");
-                        //show_proto_ops(old_sctp_ops);
-                        //old_sctp_recvmsg = sock->ops->recvmsg;
-                    }
+                switch(sock->sk->sk_protocol)
+                {
+                    case IPPROTO_SCTP:
+                        printk(KERN_INFO "replace SCTP\n");
+                        if(!ku_sctpops_list.list[i].old_sctp_ops || true)
+                        {
+                            ku_sctpops_list.list[i].old_sctp_ops = sock->ops;
+                            ku_sctpops_list.list[i].new_sctp_ops = *sock->ops;
+                            ku_sctpops_list.list[i].new_sctp_ops.recvmsg = ku_sctp_recvmsg;
+                            printk("new ops :\n");
+                            show_proto_ops(&ku_sctpops_list.list[i].new_sctp_ops);
+                            sock->ops = &ku_sctpops_list.list[i].new_sctp_ops;
+                        }
+                        if(!origin_sctp_ops || true)
+                        {
+                            origin_sctp_ops = sock->ops;
+                            show_proto_ops(sock->ops);
+                            show_proto_ops(origin_sctp_ops);
+                        }
 
-                    break;
-                case IPPROTO_UDP:
-                    printk(KERN_INFO "replace UDP\n");
-                    if(!old_udp_ops)
-                    {
-                        old_udp_ops = sock->ops;
-                        new_udp_ops = *sock->ops;
-                        new_udp_ops.recvmsg = ku_udp_recvmsg;
-                        sock->ops = &new_udp_ops;
-                    }
-
-                    break;
-                default:
-                    break;
+                        break;
+                    case IPPROTO_UDP:
+                        printk(KERN_INFO "replace UDP\n");
+                        break;
+                    default:
+                        break;
+                }
             }
+            ep_v(&task_info);
         }
-        ep_v(&task_info);
     }
     printk(KERN_INFO "ep_replace finished\n");
     return 0;
@@ -471,50 +563,42 @@ ep_replace(void)
 void ep_recover(void)
 {
     struct socket * sock;
-    int err;
+    int err, i;
     task_info_t task_info;
 
-    if(!old_udp_ops && !old_sctp_ops)
-      return;
-
-    //printk(KERN_INFO "recover : old_sctp_ops = %p", old_sctp_ops);
-    sock = find_sock_by_pid_fd(ep_pid, ep_fd, &err, &task_info);
-    if(!sock) return;
-    else
+    for(i = 0; i < ep_cfgs.ku_cfgs.count; ++i)
     {
-        if(sock->ops->family == AF_INET)
+        sock = find_sock_by_pid_fd(ep_cfgs.ku_cfgs.configs[i].pid, 
+                    ep_cfgs.ku_cfgs.configs[i].fd, &err, &task_info);
+        if(!sock) return;
+        else
         {
-            switch(sock->sk->sk_protocol)
+            if(sock->ops->family == AF_INET)
             {
-                case IPPROTO_SCTP:
-                    //printk(KERN_INFO "recover sctp\n");
-                    sock->ops = old_sctp_ops;
-                    printk(KERN_INFO "recover : sock->ops = %p <-- old_sctp_ops = %p", sock->ops, old_sctp_ops);
-                    printk(KERN_INFO "=========sock->ops======\n");
-                    show_proto_ops(sock->ops);
-                    printk(KERN_INFO "=========old_sctp_ops======\n");
-                    show_proto_ops(old_sctp_ops);
-                    break;
-                case IPPROTO_UDP:
-                    printk(KERN_INFO "recover udp\n");
-                    sock->ops = old_udp_ops;
-                    break;
-                default:
-                    break;
+                switch(sock->sk->sk_protocol)
+                {
+                    case IPPROTO_SCTP:
+                        printk(KERN_INFO "recover sctp\n");
+                        if(origin_sctp_ops)
+                        {
+                            sock->ops = origin_sctp_ops;
+                            show_proto_ops(sock->ops);
+                        }
+                        ep_cfgs.ku_cfgs.count = 0;
+                        origin_sctp_ops = NULL;
+                        break;
+                    case IPPROTO_UDP:
+                        printk(KERN_INFO "recover udp\n");
+                        break;
+                    default:
+                        break;
+                }
             }
+            ep_v(&task_info);
         }
-        ep_v(&task_info);
     }
     printk(KERN_INFO "ep_recover finished\n");
 }
-
-//static void 
-//ep_lock(task_info_t * task_info)
-//{
-//  task_lock(task_info->task);
-//  spin_lock(&task_info->files->file_lock);
-//  spin_lock(&task_info->file->f_lock);
-//}
 
 static void 
 ep_unlock(task_info_t * task_info)
@@ -621,4 +705,44 @@ ep_put_task_struct(struct task_struct * task)
         //task_lock(task);
     }
     rcu_read_unlock();
+}
+
+static void
+print_configs(const struct ku_configs * cfgs)
+{
+    int i;
+    printk(KERN_INFO "count = %d : \n", cfgs->count);
+    for(i = 0; i < cfgs->count && i < KU_MAX_CONFIG; ++i)
+      printk(KERN_INFO "pid=%d, fd=%d, ip=%08x, port=%04x\n",
+                  cfgs->configs[i].pid, 
+                  cfgs->configs[i].fd, 
+                  cfgs->configs[i].ip, 
+                  cfgs->configs[i].port);
+}
+
+
+static int ep_del_filter(int index)
+{
+    int i;
+
+    if(index < 0 || index >= ep_cfgs.filter_ct) 
+    {
+        printk("ep_del_filter : invalid filter index %d\n", 
+                    index);
+        return -1;
+    }
+
+    /** move*/
+    for(i = index; i < ep_cfgs.filter_ct - 1; ++i)
+      memcpy(ep_cfgs.filters[i], ep_cfgs.filters[i + 1], MAX_FILTER_SZ);
+    ep_cfgs.filter_ct--;
+
+    return 0;
+}
+
+static void ep_show_filter(void)
+{
+    int i;
+    for(i = 0; i < ep_cfgs.filter_ct; ++i)
+      printk(KERN_INFO "filter : %s\n", ep_cfgs.filters[i]);
 }
