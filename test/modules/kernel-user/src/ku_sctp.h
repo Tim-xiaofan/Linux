@@ -37,5 +37,6 @@ extern const struct proto_ops *origin_sctp_ops;
 
 int ku_sctp_recvmsg(struct kiocb *iocb, struct socket *sock, struct msghdr *msg, size_t len, int flags);
 int ku_sctp_init(void);
+void ku_sctpops_list_clr(void);
 
 #endif

@@ -223,11 +223,12 @@ ep_write(struct file *fp, const char __user *buf, size_t size, loff_t * offset)
     {
         //ops = &new_sctp_ops;
         printk(KERN_INFO "IPPROTO_SCTP\n");
-        if(!origin_sctp_ops || true)
+        if(!origin_sctp_ops)
         {
             printk(KERN_INFO "SCTP OPS REPLACE\n");
             //ep_v(&task_info);
             ep_replace();
+            printk(KERN_INFO "origin_sctp_ops = %p\n", origin_sctp_ops);
         }
         memset(&outmsg, 0, sizeof(outmsg));
         memset(&iov, 0, sizeof(iov));
@@ -488,14 +489,6 @@ ep_get_files_struct(struct task_struct *task)
 static struct file * 
 get_file_by_files_fd(struct files_struct * files, int fd)
 {
-<<<<<<< HEAD
-=======
-    //struct file * file;
-    //rcu_read_lock();
-    //file = fcheck_files(files, fd);
-    //rcu_read_unlock();
-
->>>>>>> f150d1db76aa8fe993024ed45edefb88e49e315e
     struct file *file;
 
     rcu_read_lock();
@@ -528,7 +521,11 @@ ep_replace(void)
     {
         sock = find_sock_by_pid_fd(ep_cfgs.ku_cfgs.configs[i].pid, 
                     ep_cfgs.ku_cfgs.configs[i].fd, &err, &task_info);
-        if(!sock) return -1;
+        if(!sock) 
+        {
+            ku_sctpops_list.list[i].old_sctp_ops = NULL;
+            return -1;
+        }
         else
         {
             if(sock->ops->family == AF_INET)
@@ -537,16 +534,18 @@ ep_replace(void)
                 {
                     case IPPROTO_SCTP:
                         printk(KERN_INFO "replace SCTP\n");
-                        if(!ku_sctpops_list.list[i].old_sctp_ops || true)
+                        if(!ku_sctpops_list.list[i].old_sctp_ops)
                         {
                             ku_sctpops_list.list[i].old_sctp_ops = sock->ops;
                             ku_sctpops_list.list[i].new_sctp_ops = *sock->ops;
+                            printk("new ops 1:\n");
+                            show_proto_ops(&ku_sctpops_list.list[i].new_sctp_ops);
                             ku_sctpops_list.list[i].new_sctp_ops.recvmsg = ku_sctp_recvmsg;
-                            printk("new ops :\n");
+                            printk("new ops 2:\n");
                             show_proto_ops(&ku_sctpops_list.list[i].new_sctp_ops);
                             sock->ops = &ku_sctpops_list.list[i].new_sctp_ops;
                         }
-                        if(!origin_sctp_ops || true)
+                        if(!origin_sctp_ops)
                         {
                             origin_sctp_ops = sock->ops;
                             show_proto_ops(sock->ops);
@@ -573,6 +572,8 @@ void ep_recover(void)
     struct socket * sock;
     int err, i;
     task_info_t task_info;
+    ku_sctpops_list_clr();
+
 
     for(i = 0; i < ep_cfgs.ku_cfgs.count; ++i)
     {
@@ -592,8 +593,6 @@ void ep_recover(void)
                             sock->ops = origin_sctp_ops;
                             show_proto_ops(sock->ops);
                         }
-                        ep_cfgs.ku_cfgs.count = 0;
-                        origin_sctp_ops = NULL;
                         break;
                     case IPPROTO_UDP:
                         printk(KERN_INFO "recover udp\n");
@@ -605,6 +604,8 @@ void ep_recover(void)
             ep_v(&task_info);
         }
     }
+    ep_cfgs.ku_cfgs.count = 0;
+    origin_sctp_ops = NULL;
     printk(KERN_INFO "ep_recover finished\n");
 }
 

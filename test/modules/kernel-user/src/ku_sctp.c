@@ -41,6 +41,15 @@ int ku_sctpmsg_get(elem_t * e)
                 &ku_sctpmsg_list_lock);
 }
 
+void ku_sctpops_list_clr(void)
+{
+    int i;
+
+    for(i = 0; i < SCTP_MAX_ASSOC; ++i)
+      ku_sctpops_list.list[i].old_sctp_ops = NULL;
+    memset(&ku_sctpops_list, 0, sizeof(struct ku_sctpops_list));
+}
+
 int ku_sctp_init(void)
 {
     int error, i, j;
